@@ -1,6 +1,7 @@
 import os
 import string
 import shutil
+import wget
 
 import datasets
 from datasets.tasks import AutomaticSpeechRecognition
@@ -108,22 +109,22 @@ class LargeASR(datasets.GeneratorBasedBuilder):
         for path in dl_paths:
             shutil.copytree(path, dirname(path), dirs_exist_ok=True)
               
-        abs_path_to_train_data = dl_manager.download_and_extract(_TRAIN_DATA_URL)
-        abs_path_to_test_data = dl_manager.download_and_extract(_TEST_DATA_URL)
+        abs_path_to_train_data = os.path.abspath(wget.download(_TRAIN_DATA_URL)) # dl_manager.download_and_extract(_TRAIN_DATA_URL)
+        abs_path_to_test_data = os.path.abspath(wget.download(_TEST_DATA_URL)) # dl_manager.download_and_extract(_TEST_DATA_URL)
         abs_path_to_clips = os.path.dirname(dl_paths[0])
 
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
                 gen_kwargs={
-                    "filepath": os.path.join(abs_path_to_train_data, "train.tsv"),
+                    "filepath": abs_path_to_train_data,
                     "path_to_clips": abs_path_to_clips,
                 },
             ),
             datasets.SplitGenerator(
                 name=datasets.Split.TEST,
                 gen_kwargs={
-                    "filepath": os.path.join(abs_path_to_test_data, "test.tsv"),
+                    "filepath": abs_path_to_test_data,
                     "path_to_clips": abs_path_to_clips,
                 },
             ),
