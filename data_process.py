@@ -1,8 +1,5 @@
-from datasets import Dataset
-import pandas as pd
+from datasets import Dataset, load_dataset
 import re
-import os
-
 
 import torchaudio
 import librosa
@@ -12,68 +9,47 @@ import torch
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
-train_df = pd.read_csv('train.csv')
-test_df = pd.read_csv('test.csv')
+from datasets import load_dataset
 
-train_data = Dataset.from_pandas(train_df)
-test_data = Dataset.from_pandas(test_df)
+# Load the dataset
+dataset = load_dataset("keshan/multispeaker-tts-sinhala")
 
-train_data = train_data.remove_columns(["x", "filename"])
-test_data = test_data.remove_columns(["x", "filename"])
-
+# Define the regular expression pattern to remove special characters
 chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"\“\%\‘\”\�]'
 
 def remove_special_characters(batch):
     batch["sentence"] = re.sub(chars_to_ignore_regex, '', batch["sentence"]).lower() + " "
     return batch
 
-train_data = train_data.map(remove_special_characters)
-test_data = test_data.map(remove_special_characters)
-
 def speech_file_to_array_fn(batch):
-    file_path = batch["file"]
-    if not os.path.exists(file_path):
-        print(f"File does not exist: {file_path}")
-        return None
-
-    try:
-        speech_array, sampling_rate = torchaudio.load(file_path)
-        batch["speech"] = speech_array[0].numpy()
-        batch["sampling_rate"] = sampling_rate
-        batch["target_text"] = batch["sentence"]
-        return batch
-    except Exception as e:
-        print(f"Error processing file: {file_path}")
-        print(f"Error message: {str(e)}")
-        return None
-
-
-train_data = train_data.map(speech_file_to_array_fn, remove_columns=train_data.column_names, num_proc=64)
-test_data = test_data.map(speech_file_to_array_fn, remove_columns=test_data.column_names, num_proc=64)
+    speech_array, sampling_rate = torchaudio.load(batch["file"])
+    batch["speech"] = speech_array[0].numpy()
+    batch["sampling_rate"] = sampling_rate
+    batch["target_text"] = batch["sentence"]
+    return batch
 
 def resample(batch):
     batch["speech"] = librosa.resample(np.asarray(batch["speech"]), 48_000, 16_000)
     batch["sampling_rate"] = 16_000
     return batch
 
-train_data = train_data.map(resample, num_proc=64)
-test_data = test_data.map(resample, num_proc=64)
-
 def prepare_dataset(batch):
-    # check that all files have the correct sampling rate
-    assert (len(set(batch["sampling_rate"])) == 1), f"Make sure all inputs have the same sampling rate of {processor.feature_extractor.sampling_rate}."
+    # Check that all files have the correct sampling rate
+    assert (len(set(batch["sampling_rate"])) == 1), f"Make sure all inputs have the same sampling rate."
 
-    batch["input_values"] = processor(batch["speech"], sampling_rate=batch["sampling_rate"][0]).input_values
-                    
-    with processor.as_target_processor():
-        batch["labels"] = processor(batch["target_text"]).input_ids
+    batch["input_values"] = batch["speech"]
+                
+    batch["labels"] = batch["target_text"]
     return batch
 
-train_data = train_data.map(prepare_dataset, remove_columns=train_data.column_names, batch_size=8, num_proc=4, batched=True, return_tensors="pt")
-test_data = test_data.map(prepare_dataset, remove_columns=test_data.column_names, batch_size=8, num_proc=4, batched=True, return_tensors="pt")
+# Map the preprocessing functions to the dataset
+dataset = dataset.map(remove_special_characters)
+dataset = dataset.map(speech_file_to_array_fn, num_proc=64)
+dataset = dataset.map(resample, num_proc=64)
+dataset = dataset.map(prepare_dataset, batch_size=8, num_proc=4, batched=True, return_tensors="pt")
 
-train_data = train_data.with_format("torch")
-test_data = test_data.with_format("torch")
+# Set the format of the dataset to PyTorch tensors
+dataset = dataset.with_format("torch")
 
-torch.save(train_data, 'train_si_asr.pt')
-torch.save(test_data, 'test_si_asr.pt')
+# Save the processed dataset
+torch.save(dataset, 'processed_dataset.pt')
