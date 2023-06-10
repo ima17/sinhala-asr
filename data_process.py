@@ -29,11 +29,22 @@ train_data = train_data.map(remove_special_characters)
 test_data = test_data.map(remove_special_characters)
 
 def speech_file_to_array_fn(batch):
-    speech_array, sampling_rate = torchaudio.load(batch["file"])
-    batch["speech"] = speech_array[0].numpy()
-    batch["sampling_rate"] = sampling_rate
-    batch["target_text"] = batch["sentence"]
-    return batch
+    file_path = batch["file"]
+    if not os.path.exists(file_path):
+        print(f"File does not exist: {file_path}")
+        return None
+
+    try:
+        speech_array, sampling_rate = torchaudio.load(file_path)
+        batch["speech"] = speech_array[0].numpy()
+        batch["sampling_rate"] = sampling_rate
+        batch["target_text"] = batch["sentence"]
+        return batch
+    except Exception as e:
+        print(f"Error processing file: {file_path}")
+        print(f"Error message: {str(e)}")
+        return None
+
 
 train_data = train_data.map(speech_file_to_array_fn, remove_columns=train_data.column_names, num_proc=64)
 test_data = test_data.map(speech_file_to_array_fn, remove_columns=test_data.column_names, num_proc=64)
