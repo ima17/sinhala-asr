@@ -22,7 +22,7 @@ def remove_special_characters(batch):
     return batch
 
 def speech_file_to_array_fn(batch):
-    speech_array, sampling_rate = torchaudio.load(batch["file"])
+    speech_array, sampling_rate = torchaudio.load(batch["audio_path"])
     batch["speech"] = speech_array[0].numpy()
     batch["sampling_rate"] = sampling_rate
     batch["target_text"] = batch["sentence"]
