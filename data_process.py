@@ -17,7 +17,7 @@ train_data = Dataset.from_pandas(train_df)
 test_data = Dataset.from_pandas(test_df)
 
 train_data = train_data.remove_columns(["x", "filename"])
-test_data = test_data.remove_columns(["full", "x", "filename"])
+test_data = test_data.remove_columns(["x", "filename"])
 
 chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"\“\%\‘\”\�]'
 
